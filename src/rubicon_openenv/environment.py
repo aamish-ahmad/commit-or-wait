@@ -29,10 +29,14 @@ COMMIT_ACTIONS = {
     "close_false_positive": "false_positive"
 }
 
-class RubiconEnvironment:
-    def __init__(self, task: str = "easy"):
-        self.task = task
-        self.reset()
+# class RubiconEnvironment:
+#     def __init__(self, task: str = "easy"):
+#         self.task = task
+#         self.reset()
+from pydantic import BaseModel
+
+class ResetRequest(BaseModel):
+    task: str = "easy"
 
     # def reset(self):
     #     self.step_count = 0
