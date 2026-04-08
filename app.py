@@ -16,15 +16,22 @@ api = FastAPI()
 def health():
     return {"status": "healthy"}
 
+import random
+
 @api.post("/step")
 def step():
-    return {
-        "decision": "wait",
-        "cost": 3,
-        "confidence": 0.62,
-        "wrong_path_steps": 5
-    }
+    decision = random.choice(["wait", "commit"])
+    
+    cost = random.randint(1, 10)
+    confidence = round(random.uniform(0.5, 0.95), 2)
+    wrong_steps = random.randint(0, 10)
 
+    return {
+        "decision": decision,
+        "cost": cost,
+        "confidence": confidence,
+        "wrong_path_steps": wrong_steps
+    }
 def run_api():
     uvicorn.run(api, host="0.0.0.0", port=8000)
 
@@ -49,29 +56,35 @@ def check_health():
 def run_step():
     try:
         res = requests.post(f"{BASE}/step").json()
-        res["interpretation"] = (
-            "Agent chose to WAIT → gathering more info before committing."
-        )
+
+        if res["decision"] == "wait":
+            res["interpretation"] = "Agent is delaying action to reduce uncertainty."
+        else:
+            res["interpretation"] = "Agent commits early — risk of being wrong."
+
         return res
     except Exception as e:
         return str(e)
 
-with gr.Blocks() as demo:
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+
     gr.Markdown("# ⚖️ Rubicon")
-    gr.Markdown("### When should an agent act vs wait?")
+    gr.Markdown("### Decision Timing Under Uncertainty")
 
     gr.Markdown(
-        "Rubicon evaluates decision timing — not just accuracy.\n\n"
-        "- Acting too early → wrong decision\n"
-        "- Waiting too long → unnecessary cost\n"
+        "Rubicon evaluates **when an agent decides**, not just what it decides.\n\n"
+        "• Early action → risk of error\n"
+        "• Late action → unnecessary cost\n"
     )
 
     with gr.Row():
-        btn1 = gr.Button("Check System Health")
-        btn2 = gr.Button("Simulate Decision Step")
+        btn1 = gr.Button("🩺 Check System")
+        btn2 = gr.Button("⚡ Run Decision Step")
 
-    out1 = gr.JSON(label="System Status")
-    out2 = gr.JSON(label="Agent Decision Output")
+    with gr.Row():
+        out1 = gr.JSON(label="System Status")
+        out2 = gr.JSON(label="Agent Decision + Metrics")
+    
 
     btn1.click(check_health, outputs=out1)
     btn2.click(run_step, outputs=out2)
