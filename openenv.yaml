@@ -1,0 +1,12 @@
+name: rubicon-openenv
+version: 0.1.0
+tasks:
+  - name: easy
+    grader: deterministic
+  - name: medium
+    grader: deterministic
+  - name: hard
+    grader: deterministic
+description: |openenv validate .
+  Partially observable RL environment for security incident triage.
+  Agents learn when to commit irreversible escalations under uncertainty.
