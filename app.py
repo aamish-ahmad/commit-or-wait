@@ -1,4 +1,15 @@
-import subprocess
-import sys
+import gradio as gr
 
-subprocess.run([sys.executable, "server/app.py"])
+def status():
+    return "Rubicon is running ✅"
+
+demo = gr.Interface(
+    fn=status,
+    inputs=[],
+    outputs="text",
+    title="Rubicon",
+    description="Decision timing evaluation environment"
+)
+
+if __name__ == "__main__":
+    demo.launch()
