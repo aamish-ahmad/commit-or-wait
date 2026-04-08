@@ -1,117 +1,74 @@
 import os
-import sys
-sys.path.insert(0, "src")
-
+import requests
 from openai import OpenAI
-from rubicon_openenv.environment import RubiconEnvironment
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-API_KEY = os.getenv("HF_TOKEN")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+API_KEY = os.getenv("OPENAI_API_KEY", "your-key-here")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+ENV_URL = "http://localhost:7860"
 
-MAX_STEPS = 10
-TASKS = ["easy", "medium", "hard"]
+def log_start(task, env, model):
+    print(f"[START] task={task} env={env} model={model}", flush=True)
 
-client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+def log_step(step, action, reward, done, error):
+    print(f"[STEP] step={step} action={action} reward={reward} done={done} error={error}", flush=True)
 
+def log_end(success, steps, score, rewards):
+    print(f"[END] success={success} steps={steps} score={score} rewards={rewards}", flush=True)
 
-def get_action(obs, task):
-    prompt = f"""You are a security analyst.
-
-Choose EXACTLY ONE action from this list:
-
-inspect_headers
-analyze_process
-check_network
-review_user_behavior
-escalate_phishing
-escalate_malware
-close_false_positive
-
-Return ONLY the exact action string. No explanation.
-
-Context:
-Step: {obs.step}
-Alerts: {obs.alerts}
-Belief: {obs.belief}
-Uncertainty: {obs.uncertainty:.2f}
-History: {obs.action_history}
-Time: {obs.time_remaining}
-"""
-
-    valid = [
-        "inspect_headers",
-        "analyze_process",
-        "check_network",
-        "review_user_behavior",
-        "escalate_phishing",
-        "escalate_malware",
-        "close_false_positive"
-    ]
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=5,
-            temperature=0.0
-        )
-
-        raw = (response.choices[0].message.content or "").strip().lower()
-
-        # clean output
-        raw = raw.split("\n")[0]
-        raw = raw.replace(".", "").replace(",", "")
-        raw = raw.replace(" ", "_").strip()
-
-        if raw in valid:
-            return raw
-
-        for v in valid:
-            if v in raw:
-                return v
-
-        return valid[obs.step % len(valid)]
-
-    except Exception:
-        return valid[obs.step % len(valid)]
-
-
-def run_task(task_name):
-    env = RubiconEnvironment(task=task_name)
-    obs = env.reset()
-
-    rewards = []
-    print(f"[START] task={task_name} env=rubicon model={MODEL_NAME}")
-
-    for step in range(1, MAX_STEPS + 1):
-        action = get_action(obs, task_name)
-
-        obs, reward, done, info = env.step(action)
-
-        raw_reward = reward.value
-        norm_reward = max(0.0, min(1.0, (raw_reward + 1.0) / 2.0))
-        rewards.append(norm_reward)
-
-        error = info.get("last_action_error")
-        error = error if error else "null"
-
-        print(f"[STEP] step={step} action={action} reward={norm_reward:.2f} done={str(done).lower()} error={error}")
-
-        if done:
-            break
-
-    total = sum(rewards)
-    score = min(1.0, max(0.0, total / len(rewards))) if rewards else 0.0
-
-    success = score >= 0.5
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-
-    print(f"[END] success={str(success).lower()} steps={step} score={score:.3f} rewards={rewards_str}")
-
-    return score
-
+def main():
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    
+    tasks = ["easy", "medium", "hard"]
+    
+    for task in tasks:
+        log_start(task=task, env="rubicon-fraud-analyst", model=MODEL_NAME)
+        
+        # Reset Env
+        res = requests.post(f"{ENV_URL}/reset", json={"task": task}).json()
+        obs = res.get("observation", "")
+        
+        done = False
+        step = 0
+        rewards = []
+        score = 0.0
+        
+        while not done and step < 5:
+            step += 1
+            
+            # Ask LLM what to do
+            prompt = f"You are a fraud analyst. Observation: {obs}. Should you 'investigate', 'freeze_account', or 'approve_transaction'? Reply with ONLY the action word."
+            
+            try:
+                completion = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0
+                )
+                action = completion.choices[0].message.content.strip().lower()
+            except Exception as e:
+                action = "investigate"
+                
+            # Clean up action formatting for safety
+            if "freeze" in action: action = "freeze_account"
+            elif "approve" in action: action = "approve_transaction"
+            else: action = "investigate"
+            
+            # Step Env
+            step_res = requests.post(f"{ENV_URL}/step", json={"action": {"action_type": action}}).json()
+            obs = step_res.get("observation", "")
+            reward = step_res.get("reward", 0.0)
+            done = step_res.get("done", False)
+            
+            rewards.append(reward)
+            log_step(step=step, action=action, reward=reward, done=done, error=None)
+            
+            if done:
+                score = reward # Grader gives final score in the last reward
+                break
+                
+        success = score >= 0.5
+        log_end(success=success, steps=step, score=score, rewards=rewards)
 
 if __name__ == "__main__":
-    for task in TASKS:
-        run_task(task)
+    main()

@@ -1,12 +1,7 @@
-name: rubicon-openenv
-version: 0.1.0
+version: "1.0"
+name: rubicon-fraud-analyst
+description: Evaluates an agent's ability to balance investigation cost vs decision risk in fraud detection.
 tasks:
-  - name: easy
-    grader: deterministic
-  - name: medium
-    grader: deterministic
-  - name: hard
-    grader: deterministic
-description: |openenv validate .
-  Partially observable RL environment for security incident triage.
-  Agents learn when to commit irreversible escalations under uncertainty.
+  - easy
+  - medium
+  - hard

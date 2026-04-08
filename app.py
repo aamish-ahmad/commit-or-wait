@@ -1,40 +1,37 @@
-# app.py
 from fastapi import FastAPI
 from typing import Optional, Dict, Any
 import sys
 import os
 
-# Ensure Python can find your src folder
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
-
-from rubicon_openenv.environment import RubiconEnvironment
+from rubicon_openenv.environment import FraudEnvironment
 
 app = FastAPI()
-
-# Initialize your environment
-env = RubiconEnvironment(task="easy")
+env = FraudEnvironment()
 
 @app.post("/reset")
 async def reset_env(payload: Optional[Dict[str, Any]] = None):
-    # Grader sends a POST to reset. We absorb the payload and reset the env.
-    obs = env.reset()
+    task = "easy"
+    if payload and "task" in payload:
+        task = payload["task"]
+    obs = env.reset(task)
     return obs
 
 @app.post("/step")
 async def step_env(payload: Optional[Dict[str, Any]] = None):
-    # Grader sends a POST to step. We extract the action if it exists.
-    action = payload.get("action") if payload else None
-    
-    # Run the step in your environment
-    obs, reward, done, info = env.step(action)
-    
-    # Return the exact JSON structure the RL grader expects
-    return {
-        "observation": obs,
-        "reward": reward,
-        "done": done,
-        "info": info
-    }
+    action_type = "investigate"
+    if payload and "action" in payload:
+        if isinstance(payload["action"], dict):
+            action_type = payload["action"].get("action_type", "investigate")
+        else:
+            action_type = payload["action"]
+            
+    result = env.step(action_type)
+    return result
+
+@app.get("/state")
+async def get_state():
+    return env.state()
 
 @app.get("/health")
 async def health():

@@ -1,45 +1,80 @@
-
 import random
 
-class RubiconEnvironment:
-    def __init__(self, task: str = "easy"):
+class FraudEnvironment:
+    def __init__(self):
+        self.task = "easy"
+        self.step_count = 0
+        self.max_steps = 10
+        self.cost = 0.0
+        self.scenario = {}
+        
+    def reset(self, task: str = "easy"):
         self.task = task
-        self.current_step = 0
-
-    # The *args and **kwargs make this bulletproof against the grader!
-    def reset(self, *args, **kwargs):
-        self.current_step = 0
+        self.step_count = 0
+        self.cost = 0.0
         
-        # Return a simple mock observation
+        # Define the 3 required tasks
+        if task == "easy":
+            self.scenario = {
+                "desc": "Transaction: $5,000. Merchant: Unknown Electronics. IP: Russia (User usually in USA).",
+                "truth": "fraud",
+                "clue": "IP address matches known botnet."
+            }
+        elif task == "medium":
+            self.scenario = {
+                "desc": "Transaction: $45. Merchant: Local Grocery. IP: Unknown VPN.",
+                "truth": "legit",
+                "clue": "User confirmed via SMS that they are using a VPN today."
+            }
+        else: # hard
+            self.scenario = {
+                "desc": "Transaction: 50 charges of $0.99 at App Store within 2 minutes.",
+                "truth": "fraud",
+                "clue": "Card testing attack signature detected in payment gateway logs."
+            }
+            
         return {
-            "status": "ready",
-            "task_loaded": self.task,
-            "message": "Agent must decide when to act."
+            "observation": f"New case assigned. {self.scenario['desc']} Available actions: 'investigate', 'freeze_account', 'approve_transaction'."
         }
 
-    # Standard Reinforcement Learning step signature: obs, reward, done, info
-    def step(self, action=None, *args, **kwargs):
-        self.current_step += 1
+    def step(self, action_type: str, target: str = ""):
+        self.step_count += 1
+        done = False
+        reward = 0.0
+        obs = ""
         
-        # Mock logic based on your earlier code
-        decision = "wait" if action is None else action
-        cost = random.randint(1, 10)
-        confidence = round(random.uniform(0.5, 0.95), 2)
-        
-        # 1. Observation
-        obs = {
-            "decision": decision,
-            "cost_incurred": cost,
-            "confidence": confidence
-        }
-        
-        # 2. Reward (negative cost)
-        reward = -float(cost)
-        
-        # 3. Done (end episode after 5 steps or if they commit)
-        done = (self.current_step >= 5) or (decision == "commit")
-        
-        # 4. Info (extra debugging metrics)
-        info = {"wrong_path_steps": random.randint(0, 10)}
+        # Action 1: Gather Information (Costs time/money)
+        if action_type == "investigate":
+            self.cost += 0.1
+            obs = f"Investigation result: {self.scenario['clue']}. (Cost incurred: -0.1)"
+            
+        # Action 2: Commit (Irreversible)
+        elif action_type in ["freeze_account", "approve_transaction"]:
+            done = True
+            is_correct = (action_type == "freeze_account" and self.scenario["truth"] == "fraud") or \
+                         (action_type == "approve_transaction" and self.scenario["truth"] == "legit")
+            
+            if is_correct:
+                # 1.0 base score minus the cost of investigating (rewards efficiency)
+                reward = max(0.0, 1.0 - self.cost)
+                obs = f"Correct decision! The transaction was {self.scenario['truth']}."
+            else:
+                reward = 0.0 # Failed task
+                obs = f"Critical Error: Wrong decision. The transaction was {self.scenario['truth']}."
+        else:
+            obs = "Invalid action. Choose 'investigate', 'freeze_account', or 'approve_transaction'."
 
-        return obs, reward, done, info
+        if self.step_count >= self.max_steps:
+            done = True
+            reward = 0.0
+            obs = "Timeout: Fraudster escaped while you were investigating."
+
+        return {
+            "observation": obs,
+            "reward": reward,
+            "done": done,
+            "info": {"cost": self.cost, "steps": self.step_count}
+        }
+
+    def state(self):
+        return {"task": self.task, "steps": self.step_count, "accumulated_cost": self.cost}
