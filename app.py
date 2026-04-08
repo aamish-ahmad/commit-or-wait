@@ -1,3 +1,4 @@
+import sys
 import threading
 import time
 import requests
@@ -14,6 +15,29 @@ api = FastAPI()
 
 import random
 import time
+
+@api.post("/reset")
+def reset_env(task: str = "easy"):
+    sys.path.insert(0, "/app/src")
+    from rubicon_openenv.environment import RubiconEnvironment
+    env = RubiconEnvironment(task)
+    obs = env.reset()
+    return obs.model_dump()
+
+@api.post("/step")
+def step_env(action_type: str = "inspect_headers", task: str = "easy"):
+    sys.path.insert(0, "/app/src")
+    from rubicon_openenv.environment import RubiconEnvironment
+    env = RubiconEnvironment(task)
+    obs, reward, done, info = env.step(action_type)
+    return {"observation": obs.model_dump(), "reward": reward.model_dump(), "done": done, "info": info}
+
+@api.get("/state")
+def state_env(task: str = "easy"):
+    sys.path.insert(0, "/app/src")
+    from rubicon_openenv.environment import RubiconEnvironment
+    env = RubiconEnvironment(task)
+    return env.state().model_dump()
 
 @api.get("/health")
 def health():
