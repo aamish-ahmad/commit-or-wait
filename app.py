@@ -17,18 +17,9 @@ import time
 
 @api.get("/health")
 def health():
-    # 90% healthy, 10% simulated issue
-    if random.random() < 0.9:
         return {
             "status": "healthy",
-            "timestamp": time.time(),
             "service": "rubicon-backend"
-        }
-    else:
-        return {
-            "status": "degraded",
-            "issue": "latency spike detected",
-            "timestamp": time.time()
         }
 import random
 import time
