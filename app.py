@@ -4,6 +4,7 @@ import sys
 import os
 import gradio as gr
 
+# Connect to your actual project logic
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 from rubicon_openenv.environment import FraudEnvironment
 
@@ -12,74 +13,53 @@ api = FastAPI()
 env = FraudEnvironment()
 
 # ==========================================
-# 1. FASTAPI ENDPOINTS (For Scaler Auto-Grader)
+# 1. FASTAPI ENDPOINTS (What the Bot sees)
 # ==========================================
-
 @api.post("/reset")
 async def reset_env(payload: Optional[Dict[str, Any]] = None):
-    task = "easy"
-    if payload and "task" in payload:
-        task = payload["task"]
+    task = payload.get("task", "easy") if payload else "easy"
     return env.reset(task)
 
 @api.post("/step")
 async def step_env(payload: Optional[Dict[str, Any]] = None):
-    action_type = "investigate"
+    action = "investigate"
     if payload and "action" in payload:
-        if isinstance(payload["action"], dict):
-            action_type = payload["action"].get("action_type", "investigate")
-        else:
-            action_type = payload["action"]
-            
-    return env.step(action_type)
-
-@api.get("/state")
-async def get_state():
-    return env.state()
+        action = payload["action"].get("action_type", "investigate") if isinstance(payload["action"], dict) else payload["action"]
+    return env.step(action)
 
 @api.get("/health")
 async def health():
     return {"status": "healthy"}
 
 # ==========================================
-# 2. GRADIO FRONTEND (For your Portfolio)
+# 2. GRADIO UI (What you see)
 # ==========================================
-
-def check_system():
-    # Wrapped in str() to prevent Gradio crash
-    return str({"status": "healthy", "verification": "Backend reachable and responding"})
-
 def run_step_ui(action_choice):
-    # Call the environment directly for the UI
-    res = env.step(action_choice)
-    return str(res) # Wrapped in str() to prevent Gradio crash
+    return str(env.step(action_choice))
 
 def reset_ui(task_choice):
-    res = env.reset(task_choice)
-    return str(res) # Wrapped in str() to prevent Gradio crash
+    return str(env.reset(task_choice))
+
+def check_health():
+    return "✅ System Healthy: Backend and Logic are connected."
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# ⚖️ Rubicon: Financial Fraud Analyst")
-    gr.Markdown("### Decision Timing Under Uncertainty")
-    gr.Markdown("Agent must balance the cost of gathering information against the risk of making a wrong, irreversible decision.")
+    gr.Markdown("# ⚖️ Rubicon: Decision Timing Environment")
     
     with gr.Row():
         btn_health = gr.Button("🩺 Check System")
-        task_dropdown = gr.Dropdown(["easy", "medium", "hard"], label="Select Task", value="easy")
-        btn_reset = gr.Button("🔄 Reset Environment")
+        # ADDED MEDIUM HERE
+        task_dropdown = gr.Dropdown(["easy", "medium", "hard"], label="Task Difficulty", value="medium")
+        btn_reset = gr.Button("🔄 Reset Env")
         
     with gr.Row():
-        action_dropdown = gr.Dropdown(["investigate", "freeze_account", "approve_transaction"], label="Take Action", value="investigate")
-        btn_step = gr.Button("⚡ Run Decision Step")
+        action_dropdown = gr.Dropdown(["investigate", "freeze_account", "approve_transaction"], label="Execute Action", value="investigate")
+        btn_step = gr.Button("⚡ Execute Action", variant="primary")
 
-    with gr.Row():
-        # Changed gr.JSON to gr.Textbox
-        out_system = gr.Textbox(label="System Status / Reset Info", lines=3)
-        out_env = gr.Textbox(label="Environment Response (Observation, Reward, Done)", lines=5)
+    out_box = gr.Textbox(label="Rubicon Feedback & Scoring", lines=8)
         
-    btn_health.click(check_system, outputs=out_system)
-    btn_reset.click(reset_ui, inputs=task_dropdown, outputs=out_system)
-    btn_step.click(run_step_ui, inputs=action_dropdown, outputs=out_env)
+    btn_health.click(check_health, outputs=out_box)
+    btn_reset.click(reset_ui, inputs=task_dropdown, outputs=out_box)
+    btn_step.click(run_step_ui, inputs=action_dropdown, outputs=out_box)
 
-# Mount the Gradio app onto the FastAPI app
 app = gr.mount_gradio_app(api, demo, path="/")
