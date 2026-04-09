@@ -68,6 +68,7 @@ def main():
                 score = reward # Grader gives final score in the last reward
                 break
                 
+        score = max(0.05, min(0.95, score))
         success = score >= 0.5
         log_end(success=success, steps=step, score=score, rewards=rewards)
 
