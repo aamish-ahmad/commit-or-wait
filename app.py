@@ -84,3 +84,7 @@ with gr.Blocks() as demo:
     btn_step.click(run_step_ui, inputs=action_dropdown, outputs=out_box)
 
 app = gr.mount_gradio_app(api, demo, path="/ui", theme=gr.themes.Soft())
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
