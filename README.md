@@ -6,6 +6,7 @@ colorTo: red
 sdk: docker
 pinned: false
 ---
+
 # Rubicon
 
 Every decision has two properties most benchmarks ignore:
