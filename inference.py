@@ -3,7 +3,7 @@ import requests
 from openai import OpenAI
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-API_KEY = os.getenv("OPENAI_API_KEY", "your-key-here")
+API_KEY = os.getenv("API_KEY", os.getenv("OPENAI_API_KEY", "your-key-here"))
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 ENV_URL = "http://localhost:7860"
 
