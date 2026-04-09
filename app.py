@@ -16,7 +16,6 @@ env = FraudEnvironment()
 # ==========================================
 @api.post("/reset")
 async def reset_env(request: Request):
-    # This prevents the 422 error. If the bot sends an empty request, it safely defaults to {}.
     try:
         payload = await request.json()
     except Exception:
@@ -39,7 +38,16 @@ async def step_env(request: Request):
         else:
             action = payload["action"]
             
-    return env.step(action)
+    # Execute step
+    response = env.step(action)
+    
+    # --- FIRST PRINCIPLES FIX: SCALER RANGE COMPLIANCE ---
+    if isinstance(response, dict) and "reward" in response:
+        # Force reward strictly between (0.05, 0.95)
+        response["reward"] = max(0.05, min(0.95, float(response["reward"])))
+    # -----------------------------------------------------
+    
+    return response
 
 @api.get("/health")
 async def health():
@@ -54,13 +62,17 @@ async def root():
     return RedirectResponse(url="/ui")
 
 # ==========================================
-# 3. GRADIO FRONTEND (mounted at /ui to avoid route conflicts)
+# 3. GRADIO FRONTEND
 # ==========================================
 def check_health():
     return "✅ System Healthy: Backend and Logic are connected."
 
 def run_step_ui(action_choice):
-    return str(env.step(action_choice))
+    res = env.step(action_choice)
+    # Apply same clamp to UI for consistency
+    if isinstance(res, dict) and "reward" in res:
+        res["reward"] = max(0.05, min(0.95, float(res["reward"])))
+    return str(res)
 
 def reset_ui(task_choice):
     return str(env.reset(task_choice))
